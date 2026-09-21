@@ -197,139 +197,212 @@ function buildHumanUpperBody(promptText, skinMaterial, clothingMaterial, bodyRad
 
 
 // ==========================================
-// DRAGON MODEL FUNCTION (ORGANIC VERTEX SCULPTING)
+// CLEAN DRAGON MODEL GENERATOR
 // ==========================================
 function buildDragonModel(promptText, parentGroup, targetBudget = 6000) {
   const targetGroup = parentGroup || (typeof modelGroup !== 'undefined' ? modelGroup : null);
   if (!targetGroup) return;
 
-  // Dynamic Polygon Scaling across any user target budget
+  // Dynamic polygon scaling based on budget
   const budgetScale = Math.sqrt(Math.max(300, targetBudget) / 6000);
-  const bodyRadSegs = Math.max(8, Math.round(24 * budgetScale));
-  const bodyHSegs = Math.max(6, Math.round(18 * budgetScale));
-  const legSegs = Math.max(6, Math.round(12 * budgetScale));
+  const bodyRadSegs = Math.max(12, Math.round(20 * budgetScale));
+  const legSegs = Math.max(8, Math.round(14 * budgetScale));
 
-  // Solid, clean materials using flatShading to force crisp low-poly polygon facets
-  const dragonMaterial = new THREE.MeshStandardMaterial({ color: 0x228b22, roughness: 0.5, flatShading: true });
-  const bellyMaterial = new THREE.MeshStandardMaterial({ color: 0xc2b280, roughness: 0.6, flatShading: true });
-  const wingMaterial = new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.4, side: THREE.DoubleSide, flatShading: true });
-  const hornMaterial = new THREE.MeshStandardMaterial({ color: 0xd2b48c, roughness: 0.3, flatShading: true });
+  // Solid, clean materials with flatShading enabled for sharp low-poly facets
+  const dragonMaterial = new THREE.MeshStandardMaterial({ 
+    color: 0x228b22, 
+    roughness: 0.4, 
+    metalness: 0.1,
+    flatShading: true 
+  });
+  
+  const bellyMaterial = new THREE.MeshStandardMaterial({ 
+    color: 0xd2b48c, 
+    roughness: 0.5, 
+    flatShading: true 
+  });
+  
+  const wingMaterial = new THREE.MeshStandardMaterial({ 
+    color: 0xcc1111, 
+    roughness: 0.3, 
+    side: THREE.DoubleSide, 
+    flatShading: true 
+  });
+  
+  const hornMaterial = new THREE.MeshStandardMaterial({ 
+    color: 0xe5e5e5, 
+    roughness: 0.2, 
+    flatShading: true 
+  });
 
-  // --- 1. ORGANIC SCULPTED DRAGON TORSO ---
-  const bodyGeo = new THREE.CylinderGeometry(0.28, 0.32, 1.4, bodyRadSegs, bodyHSegs);
-  bodyGeo.rotateX(Math.PI / 2);
+  // --- 1. CLEAN SCULPTED MAIN TORSO ---
+  // Build torso natively along Z-axis to prevent axis rotation bugs
+  const torsoGeom = new THREE.CylinderGeometry(0.22, 0.18, 1.2, bodyRadSegs, 12);
+  torsoGeom.rotateX(Math.PI / 2); // Align front-to-back
 
-  // Deform vertices to sculpt chest, belly, and spine directly inside polygon boundary
-  const bodyPos = bodyGeo.attributes.position;
-  for (let i = 0; i < bodyPos.count; i++) {
-    let x = bodyPos.getX(i);
-    let y = bodyPos.getY(i);
-    let z = bodyPos.getZ(i);
+  const pos = torsoGeom.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    let x = pos.getX(i);
+    let y = pos.getY(i);
+    let z = pos.getZ(i);
 
-    // Taper near neck/tail, widen chest
-    const progress = (z + 0.7) / 1.4; // 0 to 1 along length
-    const ribExpansion = Math.sin(progress * Math.PI) * 0.25;
-    x *= (1 + ribExpansion);
+    // Normalize Z position along torso length (-0.6 to +0.6)
+    const t = (z + 0.6) / 1.2; 
 
-    // Expand chest downward (Belly ridge)
-    if (y < 0 && z > 0) {
-      y *= 1.35;
+    // Sculpt chest expansion (front) and tail taper (back)
+    const chestWidth = 1.0 + Math.sin(t * Math.PI) * 0.35;
+    x *= chestWidth;
+
+    // Arch the back upward and pull the belly downward
+    if (y < 0) {
+      y *= 1.25; // Deeper chest/belly
+    } else {
+      y += Math.sin(t * Math.PI) * 0.08; // Arched spine
     }
-    // Spinal ridge along top
-    if (y > 0.15) {
-      y += Math.sin(z * 12) * 0.02;
-    }
 
-    bodyPos.setXYZ(i, x, y, z);
+    pos.setXYZ(i, x, y, z);
   }
-  bodyGeo.computeVertexNormals();
-  if (typeof remapUVs === 'function') remapUVs(bodyGeo, 0.0, 0.5, 0.5, 1.0);
+  torsoGeom.computeVertexNormals();
 
-  const bodyMesh = new THREE.Mesh(bodyGeo, dragonMaterial);
-  bodyMesh.position.set(0, 0.5, 0);
-  targetGroup.add(bodyMesh);
+  const torsoMesh = new THREE.Mesh(torsoGeom, dragonMaterial);
+  torsoMesh.position.set(0, 0.55, 0);
+  targetGroup.add(torsoMesh);
 
-  // --- 2. SCULPTED HEAD & SNAUT ---
+  // --- 2. UNDERBELLY PLATE ---
+  const bellyGeom = new THREE.CylinderGeometry(0.19, 0.14, 1.0, bodyRadSegs, 8, true, -Math.PI * 0.35, Math.PI * 0.7);
+  bellyGeom.rotateX(Math.PI / 2);
+  const bellyMesh = new THREE.Mesh(bellyGeom, bellyMaterial);
+  bellyMesh.position.set(0, 0.53, 0.05);
+  targetGroup.add(bellyMesh);
+
+  // --- 3. HEAD & NECK ASSEMBLY ---
+  const neckGeom = new THREE.CylinderGeometry(0.12, 0.18, 0.5, bodyRadSegs);
+  const neckMesh = new THREE.Mesh(neckGeom, dragonMaterial);
+  neckMesh.position.set(0, 0.8, 0.5);
+  neckMesh.rotation.x = 0.45;
+  targetGroup.add(neckMesh);
+
   const headGroup = new THREE.Group();
   
-  const craniumGeo = new THREE.SphereGeometry(0.18, bodyRadSegs, bodyRadSegs);
-  craniumGeo.scale(0.85, 0.9, 1.2);
-  const craniumMesh = new THREE.Mesh(craniumGeo, dragonMaterial);
+  // Skull
+  const craniumGeom = new THREE.SphereGeometry(0.16, bodyRadSegs, bodyRadSegs);
+  craniumGeom.scale(0.85, 0.8, 1.1);
+  const craniumMesh = new THREE.Mesh(craniumGeom, dragonMaterial);
   headGroup.add(craniumMesh);
 
-  // Snout deforms into realistic reptilian jaw
-  const snoutGeo = new THREE.ConeGeometry(0.14, 0.45, bodyRadSegs);
-  snoutGeo.rotateX(Math.PI / 2);
-  const snoutPos = snoutGeo.attributes.position;
-  for (let i = 0; i < snoutPos.count; i++) {
-    let y = snoutPos.getY(i);
-    if (y < 0) snoutPos.setY(i, y * 0.6); // Flatten bottom jaw
-  }
-  snoutGeo.computeVertexNormals();
-  
-  const snoutMesh = new THREE.Mesh(snoutGeo, dragonMaterial);
-  snoutMesh.position.set(0, -0.03, 0.35);
+  // Snout
+  const snoutGeom = new THREE.ConeGeometry(0.12, 0.38, bodyRadSegs);
+  snoutGeom.rotateX(Math.PI / 2);
+  const snoutMesh = new THREE.Mesh(snoutGeom, dragonMaterial);
+  snoutMesh.position.set(0, -0.02, 0.22);
   headGroup.add(snoutMesh);
 
   // Horns
-  [-0.09, 0.09].forEach(xOffset => {
-    const hornGeo = new THREE.ConeGeometry(0.04, 0.38, 8);
-    hornGeo.rotateX(-0.3);
-    const horn = new THREE.Mesh(hornGeo, hornMaterial);
-    horn.position.set(xOffset, 0.22, -0.05);
+  [-0.08, 0.08].forEach(xOff => {
+    const hornGeom = new THREE.ConeGeometry(0.035, 0.32, 8);
+    hornGeom.rotateX(-0.35);
+    const horn = new THREE.Mesh(hornGeom, hornMaterial);
+    horn.position.set(xOff, 0.16, -0.05);
     headGroup.add(horn);
   });
 
-  headGroup.position.set(0, 0.88, 0.65);
+  headGroup.position.set(0, 1.0, 0.68);
   targetGroup.add(headGroup);
 
-  // --- 3. SCULPTED LEGS ---
-  [[-0.24, 0.18, 0.42], [0.24, 0.18, 0.42], [-0.24, 0.18, -0.42], [0.24, 0.18, -0.42]].forEach(pos => {
-    const legGeo = new THREE.CylinderGeometry(0.11, 0.06, 0.55, legSegs);
-    const legMesh = new THREE.Mesh(legGeo, dragonMaterial);
-    legMesh.position.set(pos[0], pos[1], pos[2]);
-    targetGroup.add(legMesh);
+  // --- 4. CLEAN LEGS & CLAWS ---
+  const legPositions = [
+    [-0.22, 0.28, 0.35],  // Front Left
+    [0.22, 0.28, 0.35],   // Front Right
+    [-0.22, 0.28, -0.35], // Back Left
+    [0.22, 0.28, -0.35]   // Back Right
+  ];
+
+  legPositions.forEach(([lx, ly, lz]) => {
+    const legGroup = new THREE.Group();
+
+    // Thigh
+    const upperLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.065, 0.35, legSegs), dragonMaterial);
+    upperLeg.position.y = -0.12;
+    legGroup.add(upperLeg);
+
+    // Shin
+    const lowerLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.045, 0.35, legSegs), dragonMaterial);
+    lowerLeg.position.set(0, -0.32, 0.05);
+    lowerLeg.rotation.x = -0.2;
+    legGroup.add(lowerLeg);
+
+    // Foot
+    const foot = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.04, 0.14), dragonMaterial);
+    foot.position.set(0, -0.48, 0.08);
+    legGroup.add(foot);
+
+    legGroup.position.set(lx, ly, lz);
+    targetGroup.add(legGroup);
   });
 
-  // --- 4. WINGS ---
-  const wingShape = new THREE.Shape();
-  wingShape.moveTo(0, 0);
-  wingShape.lineTo(0.35, 1.0);
-  wingShape.lineTo(0.90, 0.75);
-  wingShape.lineTo(0.55, 0.20);
-  wingShape.lineTo(1.0, 0.0);
-  wingShape.closePath();
+  // --- 5. DRAGON WINGS ---
+  [-1, 1].forEach(side => {
+    const wingGroup = new THREE.Group();
 
-  const leftWingGeo = new THREE.ShapeGeometry(wingShape);
-  const leftWing = new THREE.Mesh(leftWingGeo, wingMaterial);
-  leftWing.position.set(0.15, 0.70, 0.15);
-  leftWing.rotation.set(0.0, 0.5, -0.5);
+    // Wing Strut / Arm
+    const armGeom = new THREE.CylinderGeometry(0.03, 0.02, 0.6, 8);
+    const arm = new THREE.Mesh(armGeom, dragonMaterial);
+    arm.position.set(side * 0.25, 0.25, 0);
+    arm.rotation.z = side * -0.8;
+    wingGroup.add(arm);
 
-  const rightWingGeo = new THREE.ShapeGeometry(wingShape);
-  const rightWing = new THREE.Mesh(rightWingGeo, wingMaterial);
-  rightWing.position.set(-0.15, 0.70, 0.15);
-  rightWing.rotation.set(0.0, -0.5, 0.5);
-  rightWing.scale.set(-1, 1, 1);
+    // Wing Membrane (Clean 3D Custom Shape)
+    const wingShape = new THREE.Shape();
+    wingShape.moveTo(0, 0);
+    wingShape.lineTo(0.5, 0.8);
+    wingShape.lineTo(0.9, 0.4);
+    wingShape.lineTo(0.6, -0.1);
+    wingShape.lineTo(0.3, 0.1);
+    wingShape.lineTo(0, -0.2);
+    wingShape.closePath();
 
-  targetGroup.add(leftWing, rightWing);
+    const membraneGeom = new THREE.ShapeGeometry(wingShape);
+    const membrane = new THREE.Mesh(membraneGeom, wingMaterial);
+    membrane.position.set(0, 0, 0);
+    if (side === -1) membrane.scale.set(-1, 1, 1);
 
-  // --- 5. TAPERED TAIL ---
-  const tailSegments = Math.max(6, Math.round(10 * budgetScale));
-  let currentZ = -0.68; 
-  let currentY = 0.52;
+    wingGroup.add(membrane);
+    wingGroup.position.set(side * 0.15, 0.68, 0.05);
+    wingGroup.rotation.y = side * 0.2;
+    targetGroup.add(wingGroup);
+  });
+
+  // --- 6. GRADUAL TAPERED TAIL ---
+  const tailSegments = 8;
+  let tX = 0, tY = 0.52, tZ = -0.55;
 
   for (let i = 0; i < tailSegments; i++) {
-    const t = 1 - (i / tailSegments);
-    const dragonTailGeo = new THREE.ConeGeometry(0.22 * t, 0.22, bodyRadSegs);
-    dragonTailGeo.rotateX(-Math.PI / 2);
+    const progress = i / tailSegments;
+    const radius = 0.16 * (1 - progress * 0.85);
+    const length = 0.22;
 
-    const tailMesh = new THREE.Mesh(dragonTailGeo, dragonMaterial);
-    tailMesh.position.set(0, currentY, currentZ);
-    targetGroup.add(tailMesh);
-    currentZ -= (0.18 * (1 / budgetScale));
-    currentY -= 0.015;
+    const tailGeom = new THREE.CylinderGeometry(radius * 0.85, radius, length, bodyRadSegs);
+    tailGeom.rotateX(Math.PI / 2);
+    const tailSeg = new THREE.Mesh(tailGeom, dragonMaterial);
+
+    tailSeg.position.set(tX, tY, tZ);
+    targetGroup.add(tailSeg);
+
+    // Curve tail slightly down and to the side
+    tZ -= length * 0.85;
+    tY -= 0.025;
+    tX += Math.sin(i * 0.4) * 0.03;
   }
 }
+
+// Re-assign window reference
+window.buildDragonModel = buildDragonModel;
+if (typeof CREATURE_REGISTRY !== 'undefined') {
+  CREATURE_REGISTRY.dragon = window.buildDragonModel;
+  CREATURE_REGISTRY.wyrm = window.buildDragonModel;
+  CREATURE_REGISTRY.drake = window.buildDragonModel;
+}
+
 
 
 // ==========================================
