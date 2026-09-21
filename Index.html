@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D AI Model Generator</title>
+    
+    <!-- External CSS -->
+    <link rel="stylesheet" href="3Dpolydevice.css">
+
+    <!-- Three.js Core Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <!-- Three.js OrbitControls -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <!-- Three.js Exporters (REQUIRED FOR OBJ + MTL BUNDLING) -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/OBJExporter.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/MTLExporter.js"></script>
+
+    <!-- JSZip Packaging Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+    <!-- FileSaver for triggering download prompt -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+</head>
+<body>
+
+  <!-- Three.js Canvas Target Container -->
+  <div id="canvas-container"></div>
+
+  <!-- UI Control Panel -->
+  <div id="controls">
+    <div class="panel-step">
+      <div class="step-title">STEP 1: Set Balloon Boundary & Poly Budget</div>
+      <div class="input-group">
+        <input type="number" id="poly-input" value="6000">
+        <button id="lock-btn">Lock Poly Count & Size</button>
+        <button id="reset-btn">Reset Engine</button>
+      </div>
+    </div>
+
+    <div class="panel-step">
+      <div class="step-title">STEP 2: Enter AI Prompt</div>
+      <div class="input-group">
+        <input type="text" id="prompt-input" value="Male" placeholder="Set polycount in Step 1 first..." disabled>
+        <button id="generate-btn" disabled>Generate Model</button>
+      </div>
+    </div>
+
+    <div class="panel-step">
+      <div class="step-title">STEP 3: Export Model</div>
+      <div class="input-group">
+        <input type="text" id="export-name-input" value="ModelExport">
+        <button id="export-btn">Export OBJ + MTL Bundle</button>
+      </div>
+    </div>
+
+    <div id="status-text">Status: Engine reset. Lock poly count to begin.</div>
+  </div>
+
+  <!-- Script Modules Loaded In Sequence -->
+  <script src="bodyParts.js"></script>
+  <script src="human.js"></script>
+  <script src="clothes.js"></script>
+  <script src="armor.js"></script>
+  <script src="toys.js"></script>
+  <script src="fictional.js"></script>
+  <script src="animal.js"></script>
+  <script src="texturesAndExport.js"></script>
+  <script src="engine.js"></script>
+</body>
+</html>
