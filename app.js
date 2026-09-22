@@ -216,4 +216,138 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
+// ==========================================
+// DATA PAYLOAD STRUCTURING ENGINE (FOR HOME AI SERVER)
+// ==========================================
+
+/**
+ * Converts a File object (image) to a Base64 encoded string.
+ */
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = error => reject(error);
+  });
+}
+
+/**
+ * Extracts 3D vertex coordinates from the current active Poly-Bubble.
+ */
+function extractBubbleVertexData(mesh) {
+  const positionAttribute = mesh.geometry.attributes.position;
+  const vertexArray = [];
+
+  for (let i = 0; i < positionAttribute.count; i++) {
+    vertexArray.push({
+      id: i,
+      x: parseFloat(positionAttribute.getX(i).toFixed(5)),
+      y: parseFloat(positionAttribute.getY(i).toFixed(5)),
+      z: parseFloat(positionAttribute.getZ(i).toFixed(5))
+    });
+  }
+
+  return vertexArray;
+}
+
+/**
+ * Formats and packages the entire generation payload.
+ */
+async function buildAIPayload() {
+  const imageInput = document.getElementById('image-upload');
+  const polyBudgetInput = document.getElementById('poly-budget');
+
+  if (!imageInput.files[0]) {
+    alert("Please upload a 2D source image first.");
+    return null;
+  }
+
+  if (!activeBubbleMesh) {
+    alert("Proxy Poly-Bubble not found. Generate the bubble first.");
+    return null;
+  }
+
+  updateStatsOverlay("Packaging Image & Vertex Data...", currentPolyCount);
+
+  // 1. Convert Image to Base64 Data Stream
+  const base64Image = await fileToBase64(imageInput.files[0]);
+
+  // 2. Extract Locked Vertex Coordinates
+  const initialVertices = extractBubbleVertexData(activeBubbleMesh);
+
+  // 3. Construct Standardized JSON Payload
+  const payload = {
+    timestamp: new Date().toISOString(),
+    config: {
+      targetPolygonCount: currentPolyCount,
+      totalVertices: initialVertices.length,
+      mode: "in_bubble_deformation"
+    },
+    sourceImage: {
+      fileName: imageInput.files[0].name,
+      fileType: imageInput.files[0].type,
+      base64Data: base64Image
+    },
+    proxyBubbleMesh: {
+      vertexCount: initialVertices.length,
+      vertices: initialVertices
+    }
+  };
+
+  console.log("=== AI SERVER PAYLOAD CREATED ===", payload);
+  updateStatsOverlay("Payload Formatted & Ready for AI Server", currentPolyCount);
+
+  return payload;
+}
+
+/**
+ * Sends the payload to your local home AI hardware endpoint.
+ */
+async function sendToLocalAIServer(endpointUrl, payload) {
+  try {
+    updateStatsOverlay("Transmitting Payload to Home AI Hardware...", currentPolyCount);
+
+    const response = await fetch(endpointUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      throw new Error(`AI Server Error: ${response.statusText}`);
+    }
+
+    const resultData = await response.json();
+    
+    // Apply Deformed Coordinates back to the Poly-Bubble
+    if (resultData && resultData.deformedVertices) {
+      applyDeformedVertices(resultData.deformedVertices);
+      updateStatsOverlay("In-Bubble AI Deformation Complete!", currentPolyCount);
+    }
+
+  } catch (error) {
+    console.error("AI Server Transmission Failed:", error);
+    updateStatsOverlay("AI Server Offline - Local Payload Standby", currentPolyCount);
+  }
+}
+
+/**
+ * Applies the predicted 3D offsets from the AI server directly
+ * onto the locked Poly-Bubble geometry without changing vertex counts.
+ */
+function applyDeformedVertices(deformedVertexArray) {
+  if (!activeBubbleMesh) return;
+
+  const positions = activeBubbleMesh.geometry.attributes.position;
+
+  deformedVertexArray.forEach((v) => {
+    positions.setXYZ(v.id, v.x, v.y, v.z);
+  });
+
+  positions.needsUpdate = true;
+  activeBubbleMesh.geometry.computeVertexNormals();
+}
 
