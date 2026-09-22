@@ -149,3 +149,71 @@ document.addEventListener('DOMContentLoaded', () => {
     updateStatsOverlay("Ready for AI Deformation Payload", currentPolyCount);
   });
 });
+// ==========================================
+// STEP 4: ZERO-LOSS MODEL EXPORTER
+// ==========================================
+
+function exportModel(format) {
+  if (!activeBubbleMesh) {
+    alert("No active 3D model found. Please generate a model first.");
+    return;
+  }
+
+  const filename = `poly_bubble_model_${currentPolyCount}_polys`;
+
+  if (format === 'obj') {
+    // Export standard Wavefront OBJ
+    const exporter = new THREE.OBJExporter();
+    const result = exporter.parse(activeBubbleMesh);
+    saveStringToFile(result, `${filename}.obj`);
+  } else if (format === 'glb') {
+    // Export binary GLTF/GLB
+    const exporter = new THREE.GLTFExporter();
+    exporter.parse(
+      activeBubbleMesh,
+      function (gltf) {
+        if (gltf instanceof ArrayBuffer) {
+          saveArrayBufferToFile(gltf, `${filename}.glb`);
+        } else {
+          const output = JSON.stringify(gltf, null, 2);
+          saveStringToFile(output, `${filename}.gltf`);
+        }
+      },
+      { binary: true }
+    );
+  }
+}
+
+// Helper: Download Text/OBJ Files
+function saveStringToFile(text, filename) {
+  const blob = new Blob([text], { type: 'text/plain' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
+// Helper: Download Binary/GLB Files
+function saveArrayBufferToFile(buffer, filename) {
+  const blob = new Blob([buffer], { type: 'application/octet-stream' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
+// Bind Export Button in UI Event Listener
+document.addEventListener('DOMContentLoaded', () => {
+  const exportBtn = document.getElementById('export-btn');
+  const exportFormatSelect = document.getElementById('export-format');
+
+  if (exportBtn) {
+    exportBtn.addEventListener('click', () => {
+      const selectedFormat = exportFormatSelect.value;
+      exportModel(selectedFormat);
+    });
+  }
+});
+
